@@ -1,0 +1,72 @@
+import requests
+import re
+from datetime import date
+from bs4 import BeautifulSoup
+from openpyxl import Workbook
+from nameparser import HumanName
+
+
+BASE_URL = "https://papers.ssrn.com/sol3/cf_dev/AbsByAuth.cfm?per_id="
+SSRNID = "2205"
+agent = {"User-Agent":"Mozilla/5.0"}
+today = date.today()
+FULL_URL = BASE_URL + SSRNID
+
+page = requests.get(FULL_URL, headers=agent)
+
+soup = BeautifulSoup(page.content, "html.parser")
+
+results = soup.find(id="scholarly-papers")
+
+articles = results.find_all("div", id=re.compile('div_\d+'))
+abstracts = results.find_all("div", class_="abstract-row")
+
+for i, article in enumerate(articles):
+    print(i)
+    article_link = article.find("a", {"class":"title"})
+    article_URL = article_link["href"]
+    article_title = article_link.find("span")
+    article_citation = article.find("div", class_="reference")
+    article_notes = article.find("div", class_="note-list")
+    article_numPages = article_notes.find("span", string=re.compile('Number'))
+    article_postDate = article_notes.find("span", string=re.compile('Posted'))
+    article_authors = article.find("div", class_="authors-list")
+    article_affiliations = article.find("div", class_="afiliations")
+    downloads = article.find("div", class_="downloads")
+    article_downloads = downloads.find('span', string=re.compile('\d+'))
+    article_rank = downloads.find('span', string=re.compile("\("))
+    article_citations = article.find("a", onclick=re.compile('goToCitation'))
+    article_keywords = abstracts[i].find("p", id=re.compile('keywords'))
+
+    print("New Article")
+    print("Abstract URL: " + article_URL)
+    print("Article ID: " + article_URL.split("=")[1])
+    print("Title: " + article_title.text)
+    if article_citation is not None:
+        print("Citation(s): " + article_citation.text.strip())
+    if article_numPages is not None:
+        print("Number of Pages: " + article_numPages.text)
+    if article_postDate is not None:
+        print("Date Posted: " + article_postDate.text)
+    authlist = article_authors.text.strip()
+    authlist = authlist.replace(" and ", ", ")
+    autharray = authlist.split(", ")
+    for i in autharray:
+        name = HumanName(i)
+        print(name.title + " | " + name.first + " | " + name.middle + " | " + name.last)
+    #print("Authors: " + article_authors.text.strip())
+    affList = article_affiliations.text.strip()
+    affList = affList.replace(" and ", ", ")
+    affarray = affList.split(", ")
+    for j in affarray:
+        print(j)
+    print("Author affiliations: " + article_affiliations.text.strip())
+    if article_downloads is not None:
+        print("SSRN Downloads as of " + str(today) + ": " + article_downloads.text.strip())
+    if article_rank is not None:
+        print("SSRN Article Rank as of " + str(today) + ": " + article_rank.text)
+    if article_citations is not None:
+        print("SSRN Citations to this article as of " + str(today) + ": " + article_citations.text.strip())
+    if article_keywords is not None:
+        print("Keywords: " + article_keywords.text)
+    
